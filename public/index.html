@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>器材租借系統</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h2>器材租借申請</h2>
+            <form id="rentalForm">
+                <label for="user">使用者姓名：</label>
+                <input type="text" id="user" name="user" placeholder="請輸入您的姓名" required>
+
+                <label for="equipment">器材名稱：</label>
+                <select id="equipment" name="equipment" required>
+                    <option value="相機">相機</option>
+                    <option value="筆記型電腦">筆記型電腦</option>
+                    <option value="腳架">腳架</option>
+                    <option value="耳機">耳機</option>
+                </select>
+
+                <label for="quantity">租用數量：</label>
+                <input type="number" id="quantity" name="quantity" min="1" placeholder="請輸入租用數量" required>
+
+                <label for="rentDate">租用日期：</label>
+                <input type="text" id="rentDate" name="rentDate" readonly required>
+
+                <label for="returnDate">歸還日期：</label>
+                <input type="datetime-local" id="returnDate" name="returnDate" value="" required>
+
+                <button type="submit">提交申請</button>
+            </form>
+        </div>
+
+        <div class="status-container">
+            <h3>租借狀況</h3>
+            <button id="refreshButton">重整表單</button>
+            <table id="rentalStatusTable">
+                <thead>
+                    <tr>
+                        <th>使用者</th>
+                        <th>器材名稱</th>
+                        <th>租用數量</th>
+                        <th>租用日期</th>
+                        <th>歸還日期</th>
+                    </tr>
+                </thead>
+                <tbody id="rentalStatusTableBody">
+                    <!-- 這裡會顯示租借資料 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 設置台灣時區
+        function formatDateForTaiwan(date) {
+            return date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+        }
+
+        // 格式化日期為 yyyy/MM/dd 上午/下午 HH:mm
+        function formatDateWithTime(date) {
+            const options = { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: true, // 12 小時制
+            };
+            return date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei", ...options });
+        }
+
+        // 設置當前時間為租用日期（台灣時區）
+        const rentDate = new Date();
+        const formattedRentDate = formatDateWithTime(rentDate);
+        document.getElementById("rentDate").value = formattedRentDate;
+
+        // 設置當前時間加一天為歸還日期（台灣時區）
+        const returnDate = new Date();
+        returnDate.setDate(returnDate.getDate() + 1);
+        const formattedReturnDate = formatDateWithTime(returnDate);
+        document.getElementById("returnDate").value = formattedReturnDate;
+
+        // 表單提交處理
+        document.getElementById("rentalForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData.entries());
+
+            // 發送表單資料至伺服器
+            try {
+                const response = await fetch('/submit-rental', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.text();
+                alert(result);
+
+                // 當資料成功提交後，刷新表格
+                fetchRentalStatus();  // 重新獲取並更新表格
+            } catch (error) {
+                console.error("提交資料時發生錯誤：", error);
+                alert("提交失敗，請稍後再試！");
+            }
+        });
+
+        // 假設這個函數會顯示租借狀況
+        async function fetchRentalStatus() {
+            const response = await fetch('/rental-status');
+            const data = await response.json();
+            const tableBody = document.getElementById('rentalStatusTableBody');
+
+            // 清空表格內容
+            tableBody.innerHTML = '';
+
+            // 把從後端獲得的資料填入表格
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.user}</td>
+                    <td>${row.equipment}</td>
+                    <td>${row.quantity}</td>
+                    <td>${row.rentDate}</td>
+                    <td>${row.returnDate}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // 頁面加載時獲取租借狀況
+        window.onload = fetchRentalStatus;
+
+        // 重整表單按鈕
+        document.getElementById('refreshButton').addEventListener('click', function() {
+            fetchRentalStatus();  // 點擊時重新獲取並更新表格
+        });
+    </script>
+</body>
+</html>
